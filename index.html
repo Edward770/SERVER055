@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Auto Facebook Message Sender</title>
+  <title>Auto Facebook Messenger</title>
   <style>
     body {
       margin: 0;
@@ -61,8 +61,8 @@
 <div id="app" class="screen">
   <h2 id="welcome"></h2>
   <input type="text" id="token" placeholder="Facebook Access Token" /><br>
-  <input type="text" id="receiverId" placeholder="Target Conversation ID (e.g. 83638639373938)" /><br>
-  <input type="text" id="filePath" placeholder="File Path (e.g. /storage/A22F-9559/ABSUE 2.txt)" /><br>
+  <input type="text" id="receiverId" placeholder="Conversation ID (e.g. 8363...)" /><br>
+  <input type="file" id="textFile" accept=".txt" /><br>
   <input type="number" id="delay" placeholder="Delay (sec)" value="5" /><br>
   <button onclick="startSending()">Start Loader</button>
   <button onclick="stopSending()">Stop Loader</button>
@@ -93,30 +93,31 @@
     document.getElementById("login").classList.add("visible");
   }, 1500);
 
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   async function startSending() {
     isSending = true;
 
     const token = document.getElementById("token").value.trim();
     const receiverId = document.getElementById("receiverId").value.trim();
-    const filePath = document.getElementById("filePath").value.trim();
-    const delay = parseInt(document.getElementById("delay").value) * 1000;
+    const fileInput = document.getElementById("textFile").files[0];
+    const delayTime = parseInt(document.getElementById("delay").value) * 1000;
     const output = document.getElementById("output");
 
-    if (!token || !receiverId || !filePath) {
-      alert("Please fill all required fields.");
+    if (!token || !receiverId || !fileInput) {
+      alert("Please fill all fields and select a file.");
       return;
     }
 
-    output.innerHTML = "Starting auto messaging...<br>";
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+      const lines = e.target.result.split(/\r?\n/).filter(line => line.trim());
 
-    while (isSending) {
-      try {
-        const response = await fetch(filePath);
-        if (!response.ok) throw new Error("Cannot access file: " + filePath);
+      output.innerHTML = "Starting auto messaging...<br>";
 
-        const content = await response.text();
-        const lines = content.split(/\r?\n/).filter(line => line.trim());
-
+      while (isSending) {
         for (let line of lines) {
           if (!isSending) break;
 
@@ -129,15 +130,18 @@
           const data = await res.json();
           output.innerHTML += `Sent: "${line}" → ${data.id || data.error?.message}<br>`;
           output.scrollTop = output.scrollHeight;
-          await new Promise(r => setTimeout(r, delay));
+          await delay(delayTime);
         }
-      } catch (err) {
-        output.innerHTML += "Error: " + err.message + "<br>";
-        break;
       }
-    }
 
-    output.innerHTML += "Stopped.<br>";
+      output.innerHTML += "Stopped.<br>";
+    };
+
+    reader.onerror = () => {
+      output.innerHTML = "Error reading file.<br>";
+    };
+
+    reader.readAsText(fileInput);
   }
 
   function stopSending() {
@@ -146,4 +150,4 @@
 </script>
 
 </body>
-  </html>
+</html>
