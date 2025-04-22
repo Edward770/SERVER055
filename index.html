@@ -1,153 +1,104 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Auto Facebook Messenger</title>
+  <title>Auto Messenger</title>
   <style>
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
       background: #111;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      flex-direction: column;
-    }
-    .screen {
-      display: none;
-      flex-direction: column;
-      align-items: center;
-    }
-    .visible {
-      display: flex;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 50px;
     }
     input, button {
       margin: 10px;
       padding: 10px;
       border-radius: 10px;
       border: none;
+      font-size: 16px;
     }
     button {
-      cursor: pointer;
-      background: #007bff;
+      background-color: #007bff;
       color: white;
     }
     #output {
       margin-top: 20px;
-      max-height: 200px;
-      overflow-y: auto;
-      width: 90%;
-      text-align: left;
       font-size: 14px;
+      white-space: pre-line;
     }
   </style>
 </head>
 <body>
+  <h1>Welcome Maxxx</h1>
 
-<!-- Loader -->
-<div id="loader" class="screen visible">Loading...</div>
+  <input type="file" id="fileInput" accept=".txt"><br>
+  <input type="text" id="conversationId" placeholder="Enter Conversation ID"><br>
+  <input type="text" id="accessToken" placeholder="Enter Access Token"><br>
+  <input type="number" id="delayTime" placeholder="Delay in Seconds"><br>
 
-<!-- Login -->
-<div id="login" class="screen">
-  <h2>Login</h2>
-  <input type="text" id="nameInput" placeholder="Enter your name" />
-  <input type="password" id="passInput" placeholder="Enter password" />
-  <button onclick="login()">Login</button>
-</div>
+  <button onclick="startMessaging()">Start Loader</button>
+  <button onclick="stopMessaging()">Stop Loader</button>
 
-<!-- App Screen -->
-<div id="app" class="screen">
-  <h2 id="welcome"></h2>
-  <input type="text" id="token" placeholder="Facebook Access Token" /><br>
-  <input type="text" id="receiverId" placeholder="Conversation ID (e.g. 8363...)" /><br>
-  <input type="file" id="textFile" accept=".txt" /><br>
-  <input type="number" id="delay" placeholder="Delay (sec)" value="5" /><br>
-  <button onclick="startSending()">Start Loader</button>
-  <button onclick="stopSending()">Stop Loader</button>
   <div id="output"></div>
-</div>
 
-<script>
-  let isSending = false;
+  <script>
+    let intervalId = null;
+    let lines = [];
+    let index = 0;
 
-  function hideAllScreens() {
-    document.querySelectorAll(".screen").forEach(el => el.classList.remove("visible"));
-  }
-
-  function login() {
-    const name = document.getElementById("nameInput").value;
-    const pass = document.getElementById("passInput").value;
-    if (pass === "Hardik077" && name.trim()) {
-      hideAllScreens();
-      document.getElementById("app").classList.add("visible");
-      document.getElementById("welcome").innerText = "Welcome " + name;
-    } else {
-      alert("Invalid name or password!");
-    }
-  }
-
-  setTimeout(() => {
-    hideAllScreens();
-    document.getElementById("login").classList.add("visible");
-  }, 1500);
-
-  function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  async function startSending() {
-    isSending = true;
-
-    const token = document.getElementById("token").value.trim();
-    const receiverId = document.getElementById("receiverId").value.trim();
-    const fileInput = document.getElementById("textFile").files[0];
-    const delayTime = parseInt(document.getElementById("delay").value) * 1000;
-    const output = document.getElementById("output");
-
-    if (!token || !receiverId || !fileInput) {
-      alert("Please fill all fields and select a file.");
-      return;
+    function sendMessage(conversationId, accessToken, message) {
+      fetch(`https://graph.facebook.com/v19.0/${conversationId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messaging_type: "MESSAGE_TAG",
+          tag: "ACCOUNT_UPDATE",
+          message: { text: message },
+          access_token: accessToken
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("output").innerText += `Sent: ${message}\n`;
+      })
+      .catch(err => {
+        document.getElementById("output").innerText += `Error sending: ${message}\n`;
+      });
     }
 
-    const reader = new FileReader();
-    reader.onload = async function (e) {
-      const lines = e.target.result.split(/\r?\n/).filter(line => line.trim());
+    function startMessaging() {
+      const fileInput = document.getElementById("fileInput");
+      const conversationId = document.getElementById("conversationId").value;
+      const accessToken = document.getElementById("accessToken").value;
+      const delayTime = parseInt(document.getElementById("delayTime").value) * 1000;
 
-      output.innerHTML = "Starting auto messaging...<br>";
-
-      while (isSending) {
-        for (let line of lines) {
-          if (!isSending) break;
-
-          const res = await fetch(`https://graph.facebook.com/${receiverId}/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: `message=${encodeURIComponent(line)}&access_token=${token}`
-          });
-
-          const data = await res.json();
-          output.innerHTML += `Sent: "${line}" → ${data.id || data.error?.message}<br>`;
-          output.scrollTop = output.scrollHeight;
-          await delay(delayTime);
-        }
+      if (!fileInput.files.length) {
+        document.getElementById("output").innerText = "Please select a file.";
+        return;
       }
 
-      output.innerHTML += "Stopped.<br>";
-    };
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        lines = event.target.result.split("\n").filter(line => line.trim() !== "");
+        index = 0;
 
-    reader.onerror = () => {
-      output.innerHTML = "Error reading file.<br>";
-    };
+        document.getElementById("output").innerText = "Starting auto messaging...\n";
 
-    reader.readAsText(fileInput);
-  }
+        intervalId = setInterval(() => {
+          if (index >= lines.length) {
+            index = 0;
+          }
+          sendMessage(conversationId, accessToken, lines[index]);
+          index++;
+        }, delayTime);
+      };
+      reader.readAsText(fileInput.files[0]);
+    }
 
-  function stopSending() {
-    isSending = false;
-  }
-</script>
-
+    function stopMessaging() {
+      clearInterval(intervalId);
+      document.getElementById("output").innerText += "Stopped.\n";
+    }
+  </script>
 </body>
 </html>
