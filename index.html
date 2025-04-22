@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Facebook Message Sender</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
+    .screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+    }
+    .visible {
+      display: flex;
+    }
+    input, button {
+      margin: 10px;
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+    }
+    button {
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    #output {
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      width: 90%;
+      text-align: left;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Loader -->
+<div id="loader" class="screen visible">Loading...</div>
+
+<!-- Login -->
+<div id="login" class="screen">
+  <h2>Login</h2>
+  <input type="text" id="nameInput" placeholder="Enter your name" />
+  <input type="password" id="passInput" placeholder="Enter password" />
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- App Screen -->
+<div id="app" class="screen">
+  <h2 id="welcome"></h2>
+  <input type="text" id="token" placeholder="Facebook Access Token" /><br>
+  <input type="text" id="receiverId" placeholder="Target Conversation ID (e.g. 83638639373938)" /><br>
+  <input type="text" id="filePath" placeholder="File Path (e.g. /storage/A22F-9559/ABSUE 2.txt)" /><br>
+  <input type="number" id="delay" placeholder="Delay (sec)" value="5" /><br>
+  <button onclick="startSending()">Start Loader</button>
+  <button onclick="stopSending()">Stop Loader</button>
+  <div id="output"></div>
+</div>
+
+<script>
+  let isSending = false;
+
+  function hideAllScreens() {
+    document.querySelectorAll(".screen").forEach(el => el.classList.remove("visible"));
+  }
+
+  function login() {
+    const name = document.getElementById("nameInput").value;
+    const pass = document.getElementById("passInput").value;
+    if (pass === "Hardik077" && name.trim()) {
+      hideAllScreens();
+      document.getElementById("app").classList.add("visible");
+      document.getElementById("welcome").innerText = "Welcome " + name;
+    } else {
+      alert("Invalid name or password!");
+    }
+  }
+
+  setTimeout(() => {
+    hideAllScreens();
+    document.getElementById("login").classList.add("visible");
+  }, 1500);
+
+  async function startSending() {
+    isSending = true;
+
+    const token = document.getElementById("token").value.trim();
+    const receiverId = document.getElementById("receiverId").value.trim();
+    const filePath = document.getElementById("filePath").value.trim();
+    const delay = parseInt(document.getElementById("delay").value) * 1000;
+    const output = document.getElementById("output");
+
+    if (!token || !receiverId || !filePath) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
+    output.innerHTML = "Starting auto messaging...<br>";
+
+    while (isSending) {
+      try {
+        const response = await fetch(filePath);
+        if (!response.ok) throw new Error("Cannot access file: " + filePath);
+
+        const content = await response.text();
+        const lines = content.split(/\r?\n/).filter(line => line.trim());
+
+        for (let line of lines) {
+          if (!isSending) break;
+
+          const res = await fetch(`https://graph.facebook.com/${receiverId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: `message=${encodeURIComponent(line)}&access_token=${token}`
+          });
+
+          const data = await res.json();
+          output.innerHTML += `Sent: "${line}" → ${data.id || data.error?.message}<br>`;
+          output.scrollTop = output.scrollHeight;
+          await new Promise(r => setTimeout(r, delay));
+        }
+      } catch (err) {
+        output.innerHTML += "Error: " + err.message + "<br>";
+        break;
+      }
+    }
+
+    output.innerHTML += "Stopped.<br>";
+  }
+
+  function stopSending() {
+    isSending = false;
+  }
+</script>
+
+</body>
+  </html>
